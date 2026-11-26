@@ -8,6 +8,7 @@
 #include <mpi.h>
 #include <string>
 #include <limits>
+#include <cstring>
 
 //Global variables
 const int arraySize = 550;
@@ -80,6 +81,13 @@ void printStudentDetails() {
     std::cout << "Student ID: 3089448" << std::endl;
 }
 
+//print array fonction
+void printArray(char* arr, int size){
+    for (int i=0; i<size; i++){
+        std::cout << arr[i];
+    }
+}
+
 int main(int argc, char** argv) {
     // TODO: Work to be done here
 
@@ -123,6 +131,9 @@ int main(int argc, char** argv) {
         std::cout << '\n' <<"your decryption key is: " << key << '\n' <<std::endl;
     }
 
+    //synchronizing bofore node 0 broadcasting
+    MPI_Barrier( MPI_COMM_WORLD);
+
 
     //node 0 will broadcast the key to all other nodes
     MPI_Bcast(&key, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -132,10 +143,46 @@ int main(int argc, char** argv) {
 
     // question b part *************************************************************
 
-    //node 0 will read the cypher text file
+    //partitioning the array equally bettwen nodes (declaring)
+    int partitionArraySize = arraySize / world_size;
+    char partitionArray[partitionArraySize];
+
     if (world_rank == 0) {
-        createData(world_rank);
+        createData(world_rank); //node 0 will read the cypher text file and populate the array
     }
+    //using mpi scatter to give equal partition array to all nodes off the total array
+    MPI_Scatter( totalArray , partitionArraySize , MPI_CHAR , partitionArray , partitionArraySize , MPI_CHAR , 0 , MPI_COMM_WORLD);
+
+    //debugging: making sure every node recieved the partition array by printinh the first carachter if the array
+    /*MPI_Barrier( MPI_COMM_WORLD);//synchronizing before printing
+    std::cout << '\n' <<"Node " << world_rank << " recived its partition array and its first charachter is: " << partitionArray[0]<<std::endl;
+    */
+
+
+    // question c part *************************************************************
+
+    //each node will decypher its chunk 
+    decryptText(key, partitionArray, partitionArraySize);
+    //storing into the new array
+    char decipheredArray[partitionArraySize];
+    for(int i = 0 ; i < partitionArraySize ; i++){
+        decipheredArray[i] = partitionArray[i];
+    }
+    //each node print its deciphered array
+    std::cout << '\n' << "Node " << world_rank << " has decipherd the array and its chunk is: " <<std::endl;
+    printArray(decipheredArray,partitionArraySize);
+    std::cout << std::endl;
+
+
+    // question d part *************************************************************
+
+    //synchronizing node for better consol output
+    MPI_Barrier( MPI_COMM_WORLD);
+    //each node calls search text method on its deciphered array
+    const char* needle = "DISTRIBUTED";
+    int hits = searchText(decipheredArray, partitionArraySize, needle);
+    //each node returned the amount of hits it found
+    std::cout << '\n' <<"Node: " << world_rank << " found " << hits << " hits." <<std::endl;
 
 
     //finalize mpi environment
