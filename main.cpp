@@ -185,6 +185,38 @@ int main(int argc, char** argv) {
     std::cout << '\n' <<"Node: " << world_rank << " found " << hits << " hits." <<std::endl;
 
 
+    // question e part *************************************************************
+
+    //node 0 will gather all the hits from all nodes
+    MPI_Barrier( MPI_COMM_WORLD);
+    int totalHits = 0;
+    MPI_Reduce(&hits, &totalHits, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    //node 0 will broadcast the total hits to all other nodes so node 1 can be able to print it.
+    MPI_Bcast(&totalHits, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    //node 1 will print the total hits found
+    if (world_rank == 1) {
+        std::cout << '\n' <<"Distributed was found a total of " << totalHits << " times." <<std::endl;
+    }
+
+
+    // question f part *************************************************************
+
+    //strlen of each deciphered array.
+    int count = strlen(decipheredArray);
+    //gather all counts from all nodes to node 0
+    int newTotalArraySize;
+    MPI_Gather(&count, 1, MPI_INT, &newTotalArraySize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    //using mpi gather, node 0 will collect all the deciphered arrays from other nodes and put them together.
+    MPI_Barrier( MPI_COMM_WORLD);//synchronizing before gathering
+    char* decriptedTotalArray = new char[newTotalArraySize];
+    MPI_Gather(decipheredArray,newTotalArraySize, MPI_CHAR,decriptedTotalArray,newTotalArraySize,MPI_CHAR,0,MPI_COMM_WORLD);
+    //expoting the total deciphered array to a new file
+    const char* filename = "MohamedFadelBucharayaDecryptedText.txt";
+    exportText(decriptedTotalArray, newTotalArraySize, filename);
+
+
+
     //finalize mpi environment
     MPI_Finalize();
     
